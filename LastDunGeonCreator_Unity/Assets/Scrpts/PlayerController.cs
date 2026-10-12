@@ -25,6 +25,14 @@ public class PlayerController : MonoBehaviour
     private float jumpPower = 10.0f;
 
 
+
+    /* 身軽状態のジャンプ力 */
+    [SerializeField]
+    private float lightJumpPower = 15.0f;
+
+    /* 身軽状態か */
+    private bool isLight = false;
+
     /*=========================
      * 壁判定
      *=========================*/
@@ -141,9 +149,14 @@ public class PlayerController : MonoBehaviour
         /* ジャンプ入力 */
         if (InputManager.Instance.Jump())
         {
+
+            float currentJumpPower = isLight
+                ? lightJumpPower
+                : jumpPower;
+
             rb.velocity = new Vector2(
                 rb.velocity.x,
-                jumpPower
+                currentJumpPower
             );
 
             isGrounded = false;
@@ -226,5 +239,18 @@ public class PlayerController : MonoBehaviour
             isWallLeft = false;
             isWallRight = false;
         }
+    }
+
+
+    /* ジャンプ台の効果 */
+    public void ApplyLight()
+    {
+        isLight = true;
+    }
+
+    /* 通常状態へ戻す */
+    public void ClearLight()
+    {
+        isLight = false;
     }
 }

@@ -45,6 +45,13 @@ public class StageCustomizeManager : MonoBehaviour
     /* 現在選択している配置場所 */
     private StagePlacementSlot currentSlot;
 
+    /* ステージ全体の最大配置数 */
+    [SerializeField]
+    private int maxPlacementCount = 4;
+
+    /* 現在の配置数 */
+    private int placedCount = 0;
+
 
     /*=========================
      * 状態
@@ -80,6 +87,19 @@ public class StageCustomizeManager : MonoBehaviour
         {
             currentSlot = slots[0];
         }
+
+        placedCount = 0;
+
+        for (int i = 0; i < slots.Length; i++)
+        {
+            if (slots[i] != null && slots[i].IsPlaced())
+            {
+                placedCount++;
+            }
+        }
+
+        Debug.Log("配置可能数 : " +
+                  (maxPlacementCount - placedCount));
 
         /* オブジェクト選択から開始 */
         currentMode = CustomizeMode.ObjectSelect;
@@ -373,30 +393,50 @@ public class StageCustomizeManager : MonoBehaviour
             return;
         }
 
-        StageObjectData data = objects[currentObjectIndex];
-
-        /* 個数確認 */
-        if (data.remainCount <= 0)
+        if (currentObjectIndex < 0 ||
+            currentObjectIndex >= objects.Length)
         {
             return;
         }
 
-        /* 配置 */
+        StageObjectData data = objects[currentObjectIndex];
+
+        // 既に配置されている場所には新規配置しない
+        if (currentSlot.IsPlaced())
+        {
+            Debug.Log("この場所には既にオブジェクトがあります");
+            return;
+        }
+
+        // ステージ全体の配置上限
+        if (placedCount >= maxPlacementCount)
+        {
+            Debug.Log("配置できる数がありません");
+            return;
+        }
+
+        // オブジェクト種類ごとの残り数
+        if (data.remainCount <= 0)
+        {
+            Debug.Log("このオブジェクトは残り0個です");
+            return;
+        }
+
+        // 配置
         currentSlot.PlaceObject(data.prefab);
 
-        /* 個数を減らす */
         data.remainCount--;
+        placedCount++;
 
         Debug.Log(
             data.objectName +
-            " を配置 : 残り " +
-            data.remainCount
+            " を配置 : 種類別残り " +
+            data.remainCount +
+            " / 全体残り " +
+            (maxPlacementCount - placedCount)
         );
 
-        /* オブジェクト選択へ戻る */
         currentMode = CustomizeMode.ObjectSelect;
-
-        /* 配置カーソルを非表示 */
         HideSlotSelect();
     }
 }
