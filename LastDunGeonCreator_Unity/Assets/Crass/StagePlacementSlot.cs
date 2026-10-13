@@ -1,81 +1,59 @@
-/******************************************************************************
- * @file    StagePlacementSlot.cs
- * @brief   ステージ配置位置管理クラス
- * @author  Tanaka Kaito
- ******************************************************************************/
 
 using UnityEngine;
 
-/******************************************************************************
- * @class StagePlacementSlot
- * @brief ステージ上の1つの配置場所を管理する
- ******************************************************************************/
 public class StagePlacementSlot : MonoBehaviour
 {
-    /*=========================
-     * 移動先
-     *=========================*/
-
-    /* 上 */
     public StagePlacementSlot up;
-
-    /* 下 */
     public StagePlacementSlot down;
-
-    /* 左 */
     public StagePlacementSlot left;
-
-    /* 右 */
     public StagePlacementSlot right;
 
-
-    /*=========================
-     * 表示
-     *=========================*/
-
-    /* 選択カーソル */
     public GameObject selectArrow;
-
-    /* 現在配置されているオブジェクト */
     public GameObject placedObject;
 
+    [HideInInspector]
+    public int placedObjectIndex = -1;
 
-    /*=========================
-     * 選択表示
-     *=========================*/
+    [Header("配置位置調整")]
+    [SerializeField] private float slotHalfHeight = 0.5f;
+    [SerializeField] private float bottomOffset = 0f;
+
+    [Header("配置枠")]
+    [SerializeField] private SpriteRenderer slotFrameRenderer;
 
     public void SetSelect(bool value)
     {
         if (selectArrow != null)
-        {
             selectArrow.SetActive(value);
-        }
     }
-
-
-    /*=========================
-     * オブジェクト配置
-     *=========================*/
 
     public void PlaceObject(GameObject prefab)
     {
-        /* すでに配置されている場合は削除 */
+        if (prefab == null)
+            return;
+
         RemoveObject();
 
-        /* オブジェクト生成 */
         placedObject = Instantiate(prefab, transform);
-
-        /* 配置位置を中央にする */
         placedObject.transform.localPosition = Vector3.zero;
-
-        /* 回転を初期化 */
         placedObject.transform.localRotation = Quaternion.identity;
+
+        SpriteRenderer[] renderers =
+            placedObject.GetComponentsInChildren<SpriteRenderer>();
+
+        if (renderers.Length == 0)
+            return;
+
+        Bounds bounds = renderers[0].bounds;
+
+        for (int i = 1; i < renderers.Length; i++)
+            bounds.Encapsulate(renderers[i].bounds);
+
+        float slotBottomY = transform.position.y - 0.5f;
+        float offsetY = slotBottomY - bounds.min.y;
+
+        placedObject.transform.position += Vector3.up * offsetY;
     }
-
-
-    /*=========================
-     * オブジェクト削除
-     *=========================*/
 
     public void RemoveObject()
     {
@@ -84,15 +62,20 @@ public class StagePlacementSlot : MonoBehaviour
             Destroy(placedObject);
             placedObject = null;
         }
+
+        placedObjectIndex = -1;
     }
-
-
-    /*=========================
-     * 配置確認
-     *=========================*/
 
     public bool IsPlaced()
     {
         return placedObject != null;
+    }
+
+    public void HideFrame()
+    {
+        SetSelect(false);
+
+        if (slotFrameRenderer != null)
+            slotFrameRenderer.enabled = false;
     }
 }

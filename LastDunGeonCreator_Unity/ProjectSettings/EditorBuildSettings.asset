@@ -4,5 +4,23 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/EndRollScene.unity
+    guid: 2c80b1f554e53d04eaefc2b389c71da5
+  - enabled: 1
+    path: Assets/Game1Scene.unity
+    guid: cd999895fadb5ab4e8bfd4d25bbb7361
+  - enabled: 1
+    path: Assets/Game2Scene.unity
+    guid: be0c46e89f68b794499aae5cb47e6724
+  - enabled: 1
+    path: Assets/Game3Scene.unity
+    guid: b9e995a40a6867a4ca38305f2c10bc76
+  - enabled: 1
+    path: Assets/StartScene.unity
+    guid: 2cda990e2423bbf4892e6590ba056729
+  - enabled: 1
+    path: Assets/EndScene.unity
+    guid: 09a30a80c73398340900bc6ca032eae9
   m_configObjects: {}

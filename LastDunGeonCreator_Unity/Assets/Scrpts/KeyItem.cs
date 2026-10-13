@@ -3,17 +3,38 @@ using UnityEngine;
 
 public class KeyItem : MonoBehaviour
 {
+    private bool isCollected = false;
+
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.GetComponentInParent<PlayerController>() == null)
+        Debug.Log("Œ®‚ÉÚG: " + other.name);
+
+        if (isCollected)
+            return;
+
+        PlayerController player =
+            other.GetComponentInParent<PlayerController>();
+
+        if (player == null)
         {
+            Debug.Log("PlayerController‚ªŒ©‚Â‚©‚ç‚È‚¢");
             return;
         }
 
-        if (GameManager.Instance != null)
+        Debug.Log("—EÒ‚ªŒ®‚ÉG‚ê‚½I");
+
+        if (GameManager.Instance == null)
         {
-            GameManager.Instance.AddKey();
-            Destroy(gameObject);
+            Debug.LogError("GameManager.Instance‚ªnullI");
+            return;
         }
+
+        isCollected = true;
+
+        GameManager.Instance.AddKey();
+
+        Debug.Log("Œ®æ“¾¬Œ÷I");
+
+        Destroy(gameObject);
     }
 }

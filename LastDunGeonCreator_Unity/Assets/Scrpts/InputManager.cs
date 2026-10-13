@@ -49,12 +49,15 @@ public class InputManager : MonoBehaviour
      * 内部変数
      *=========================*/
 
-    /* 前フレームの横入力 */
-    private float previousHorizontal;
+    private bool previousUp;
+    private bool previousDown;
+    private bool previousLeft;
+    private bool previousRight;
 
-    /* 前フレームの縦入力 */
-    private float previousVertical;
-
+    private bool upPressed;
+    private bool downPressed;
+    private bool leftPressed;
+    private bool rightPressed;
 
     /*=========================
      * 初期化
@@ -80,110 +83,53 @@ public class InputManager : MonoBehaviour
     /*=========================
      * 更新処理
      *=========================*/
-    
+
     void Update()
     {
-        /* 現在の入力を取得 */
         float horizontal = Input.GetAxisRaw("Horizontal");
         float vertical = Input.GetAxisRaw("Vertical");
 
-        /* 前フレームの入力を保存 */
-        previousHorizontal = horizontal;
-        previousVertical = vertical;
+        bool up = vertical > stickThreshold;
+        bool down = vertical < -stickThreshold;
+        bool left = horizontal < -stickThreshold;
+        bool right = horizontal > stickThreshold;
+
+        upPressed = up && !previousUp;
+        downPressed = down && !previousDown;
+        leftPressed = left && !previousLeft;
+        rightPressed = right && !previousRight;
+
+        previousUp = up;
+        previousDown = down;
+        previousLeft = left;
+        previousRight = right;
     }
-
-
-    /*=========================
-     * 上
-     *=========================*/
-
     public bool Up()
     {
-        /* W */
-        if (Input.GetKeyDown(KeyCode.W))
-        {
-            return true;
-        }
-
-        /* ↑ */
-        if (Input.GetKeyDown(KeyCode.UpArrow))
-        {
-            return true;
-        }
-
-        /* コントローラー上 */
-        if (previousVertical <= -stickThreshold &&
-            Input.GetAxisRaw("Vertical") > -stickThreshold)
-        {
-            return true;
-        }
-
-        return false;
+        return Input.GetKeyDown(KeyCode.W)
+            || Input.GetKeyDown(KeyCode.UpArrow)
+            || upPressed;
     }
-
-    /*=========================
-     * 下
-     *=========================*/
 
     public bool Down()
     {
-        /* S */
-        if (Input.GetKeyDown(KeyCode.S))
-        {
-            return true;
-        }
-
-        /* ↓ */
-        if (Input.GetKeyDown(KeyCode.DownArrow))
-        {
-            return true;
-        }
-
-        return false;
+        return Input.GetKeyDown(KeyCode.S)
+            || Input.GetKeyDown(KeyCode.DownArrow)
+            || downPressed;
     }
-
-
-    /*=========================
-     * 左
-     *=========================*/
 
     public bool Left()
     {
-        /* A */
-        if (Input.GetKeyDown(KeyCode.A))
-        {
-            return true;
-        }
-
-        /* ← */
-        if (Input.GetKeyDown(KeyCode.LeftArrow))
-        {
-            return true;
-        }
-
-        return false;
+        return Input.GetKeyDown(KeyCode.A)
+            || Input.GetKeyDown(KeyCode.LeftArrow)
+            || leftPressed;
     }
-
-
-    /*=========================
-     * 右
-     *=========================*/
 
     public bool Right()
     {
-        /* D */
-        if (Input.GetKeyDown(KeyCode.D))
-        {
-            return true;
-        }
-
-        /* → */
-        if (Input.GetKeyDown(KeyCode.RightArrow))
-        {
-            return true;
-        }
-
-        return false;
+        return Input.GetKeyDown(KeyCode.D)
+            || Input.GetKeyDown(KeyCode.RightArrow)
+            || rightPressed;
     }
 
     /*=========================

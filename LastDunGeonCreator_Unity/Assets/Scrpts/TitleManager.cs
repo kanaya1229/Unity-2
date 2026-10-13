@@ -26,6 +26,8 @@ public class TitleManager : MonoBehaviour
     [SerializeField]
     private Image[] selectFrames;
 
+    [Header("タイトルBGM")]
+    [SerializeField] private AudioSource titleBGM;
 
     /*=========================
      * 選択
@@ -127,9 +129,15 @@ public class TitleManager : MonoBehaviour
 
     public void StartGame()
     {
+        // タイトルBGMを停止
+        if (titleBGM != null)
+        {
+            titleBGM.Stop();
+        }
+
+        // ステージ1へ移動
         SceneManager.LoadScene("Game1Scene");
     }
-
 
     /*=========================
      * ゲーム終了

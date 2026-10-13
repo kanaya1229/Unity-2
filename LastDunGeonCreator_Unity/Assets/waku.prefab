@@ -73,7 +73,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 68
   m_Sprite: {fileID: 21300000, guid: e1ef739831c79514993b390650cd8a96, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -103,3 +103,7 @@ MonoBehaviour:
   right: {fileID: 0}
   selectArrow: {fileID: 0}
   placedObject: {fileID: 0}
+  placedObjectIndex: -1
+  slotHalfHeight: 0.5
+  bottomOffset: 0
+  slotFrameRenderer: {fileID: 0}
