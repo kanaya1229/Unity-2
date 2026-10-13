@@ -16,6 +16,7 @@ public class StageObjectData
     /*=========================
      * オブジェクト情報
      *=========================*/
+    public Sprite iconSprite;
 
     /* オブジェクト名 */
     public string objectName;

@@ -1,213 +1,211 @@
-/******************************************************************************
- * @file    PauseManager.cs
- * @brief   ポーズ画面管理クラス
- * @author  Tanaka Kaito
- ******************************************************************************/
 
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-/******************************************************************************
- * @class PauseManager
- * @brief ポーズ画面・設定画面を管理する
- ******************************************************************************/
 public class PauseManager : MonoBehaviour
 {
-    /*=========================
-     * UI
-     *=========================*/
+    public static bool IsPaused { get; private set; }
 
-    /* ポーズ画面 */
+    [Header("画面")]
+    [SerializeField] private GameObject pausePanel;
+    [SerializeField] private GameObject settingPanel;
+    [SerializeField] private Slider volumeSlider;
+
+    [Header("ポーズ項目（SETTINGS → TITLE → EXIT）")]
+    [SerializeField] private RectTransform[] pauseItems;
+
+    [Header("選択矢印")]
+    [SerializeField] private RectTransform selectArrow;
     [SerializeField]
-    private GameObject pausePanel;
+    private Vector2 arrowOffset =
+        new Vector2(-35f, 0f);
 
-    /* 設定画面 */
-    [SerializeField]
-    private GameObject settingPanel;
+    [Header("音量調整")]
+    [SerializeField] private float volumeStep = 0.05f;
 
-    /* 音量スライダー */
-    [SerializeField]
-    private Slider volumeSlider;
+    [Header("各項目の矢印位置")]
+    [SerializeField] private GameObject[] selectArrows;
 
-
-    /*=========================
-     * 内部変数
-     *=========================*/
-
-    /* ポーズ中か */
-    private bool isPaused = false;
-
-
-    /*=========================
-     * 初期化
-     *=========================*/
+    private int selectedIndex;
+    private bool isSettingOpen;
 
     void Start()
     {
-        /* 最初はポーズ画面を非表示 */
-        pausePanel.SetActive(false);
+        IsPaused = false;
+        isSettingOpen = false;
+        Time.timeScale = 1f;
 
-        /* 最初は設定画面を非表示 */
+        pausePanel.SetActive(false);
         settingPanel.SetActive(false);
 
-        /* 時間を通常に戻す */
-        Time.timeScale = 1.0f;
-
-        /* AudioManagerから現在の音量を取得 */
         if (AudioManager.Instance != null)
-        {
-            volumeSlider.value = AudioManager.Instance.GetVolume();
-        }
+            volumeSlider.SetValueWithoutNotify(
+                AudioManager.Instance.GetVolume());
     }
-
-
-    /*=========================
-     * 更新処理
-     *=========================*/
 
     void Update()
     {
-        /* ESCキーでポーズ切り替え */
-        if (Input.GetKeyDown(KeyCode.Escape))
+        if (InputManager.Instance == null)
+            return;
+
+        if (InputManager.Instance.Pause())
         {
-            if (isPaused)
-            {
+            if (IsPaused)
                 ResumeGame();
-            }
             else
-            {
                 PauseGame();
+
+            return;
+        }
+
+        if (!IsPaused)
+            return;
+
+        if (isSettingOpen)
+        {
+            SettingInput();
+            return;
+        }
+
+        if (InputManager.Instance.Up())
+            MoveSelection(-1);
+        else if (InputManager.Instance.Down())
+            MoveSelection(1);
+
+        if (InputManager.Instance.Submit())
+            ExecuteSelection();
+    }
+
+    void MoveSelection(int direction)
+    {
+        if (pauseItems == null || pauseItems.Length == 0)
+            return;
+
+        selectedIndex =
+            (selectedIndex + direction + pauseItems.Length)
+            % pauseItems.Length;
+
+        UpdateArrow();
+    }
+
+    void UpdateArrow()
+    {
+        for (int i = 0; i < selectArrows.Length; i++)
+        {
+            if (selectArrows[i] != null)
+            {
+                selectArrows[i].SetActive(i == selectedIndex);
             }
         }
     }
 
+    void ExecuteSelection()
+    {
+        switch (selectedIndex)
+        {
+            case 0:
+                OpenSetting();
+                break;
 
-    /*=========================
-     * ポーズ開始
-     *=========================*/
+            case 1:
+                ReturnToTitle();
+                break;
+
+            case 2:
+                ResumeGame();
+                break;
+        }
+    }
+
+    void SettingInput()
+    {
+        if (InputManager.Instance.Left())
+        {
+            volumeSlider.value =
+                Mathf.Clamp01(volumeSlider.value - volumeStep);
+            ChangeVolume();
+        }
+        else if (InputManager.Instance.Right())
+        {
+            volumeSlider.value =
+                Mathf.Clamp01(volumeSlider.value + volumeStep);
+            ChangeVolume();
+        }
+
+        if (InputManager.Instance.Back() ||
+            InputManager.Instance.Submit())
+        {
+            CloseSetting();
+        }
+    }
 
     public void PauseGame()
     {
-        isPaused = true;
+        IsPaused = true;
+        isSettingOpen = false;
+        selectedIndex = 0;
 
-        /* ポーズ画面を表示 */
         pausePanel.SetActive(true);
-
-        /* 設定画面を閉じる */
         settingPanel.SetActive(false);
 
-        /* ゲームを停止 */
-        Time.timeScale = 0.0f;
+        Time.timeScale = 0f;
+        UpdateArrow();
     }
-
-
-    /*=========================
-     * ポーズ解除
-     *=========================*/
 
     public void ResumeGame()
     {
-        isPaused = false;
+        IsPaused = false;
+        isSettingOpen = false;
 
-        /* ポーズ画面を非表示 */
         pausePanel.SetActive(false);
-
-        /* 設定画面を非表示 */
         settingPanel.SetActive(false);
 
-        /* ゲームを再開 */
-        Time.timeScale = 1.0f;
+        Time.timeScale = 1f;
     }
-
-
-    /*=========================
-     * 設定画面を開く
-     *=========================*/
 
     public void OpenSetting()
     {
-        /* ポーズ画面を非表示 */
-        pausePanel.SetActive(false);
+        isSettingOpen = true;
 
-        /* 設定画面を表示 */
+        pausePanel.SetActive(false);
         settingPanel.SetActive(true);
 
-        /* 現在の音量をスライダーに反映 */
         if (AudioManager.Instance != null)
-        {
-            volumeSlider.value = AudioManager.Instance.GetVolume();
-        }
+            volumeSlider.SetValueWithoutNotify(
+                AudioManager.Instance.GetVolume());
     }
-
-
-    /*=========================
-     * 設定画面を閉じる
-     *=========================*/
 
     public void CloseSetting()
     {
-        /* 設定画面を非表示 */
+        isSettingOpen = false;
+
         settingPanel.SetActive(false);
-
-        /* ポーズ画面を表示 */
         pausePanel.SetActive(true);
+
+        UpdateArrow();
     }
-
-
-    /*=========================
-     * 音量設定
-     *=========================*/
 
     public void ChangeVolume()
     {
-        /* AudioManagerが存在する場合 */
         if (AudioManager.Instance != null)
-        {
-            /* スライダーの値をAudioManagerへ渡す */
             AudioManager.Instance.SetVolume(volumeSlider.value);
-        }
     }
-
-
-    /*=========================
-     * タイトルに戻る
-     *=========================*/
 
     public void ReturnToTitle()
     {
-        /* 時間を通常に戻す */
-        Time.timeScale = 1.0f;
-
-        /* ポーズ解除 */
-        isPaused = false;
-
-        /* タイトル画面へ */
+        ResumeGame();
         SceneManager.LoadScene("StartScene");
     }
 
-
-    /*=========================
-     * ゲーム終了
-     *=========================*/
-
     public void QuitGame()
     {
-        /* 時間を通常に戻す */
-        Time.timeScale = 1.0f;
+        ResumeGame();
 
 #if UNITY_EDITOR
-
-        /* Unityエディタでは再生停止 */
         UnityEditor.EditorApplication.isPlaying = false;
-
 #else
-
-        /* ゲームを終了 */
         Application.Quit();
-
 #endif
     }
 }

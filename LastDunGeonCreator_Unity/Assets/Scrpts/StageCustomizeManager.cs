@@ -1,402 +1,412 @@
-/******************************************************************************
- * @file    StageCustomizeManager.cs
- * @brief   ステージカスタマイズ管理クラス
- * @author  Tanaka Kaito
- ******************************************************************************/
 
 using UnityEngine;
 
-/******************************************************************************
- * @class StageCustomizeManager
- * @brief ステージカスタマイズ画面全体を管理する
- ******************************************************************************/
 public class StageCustomizeManager : MonoBehaviour
 {
-    /*=========================
-     * 配置場所
-     *=========================*/
+    [Header("配置場所（左から順番）")]
+    [SerializeField] private StagePlacementSlot[] slots;
 
-    /* ステージ上の配置場所 */
-    [SerializeField]
-    private StagePlacementSlot[] slots;
+    [Header("配置オブジェクト")]
+    [SerializeField] private StageObjectData[] objects;
 
+    [Header("配置数")]
+    [SerializeField] private int maxPlacementCount = 4;
 
-    /*=========================
-     * 配置オブジェクト
-     *=========================*/
+    [Header("オブジェクト画像")]
+    [SerializeField] private StageObjectUI objectUI;
 
-    /* 選択可能なオブジェクト */
-    [SerializeField]
-    private StageObjectData[] objects;
+    [Header("数字画像")]
+    [SerializeField] private StageNumberUI totalRemainUI;
+    [SerializeField] private StageNumberUI objectRemainUI;
 
+    [Header("エリア選択矢印")]
+    [SerializeField] private GameObject objectSelectArrow;
+    [SerializeField] private GameObject startSelectArrow;
 
-    /*=========================
-     * オブジェクト選択
-     *=========================*/
+    [Header("カスタマイズ専用UI")]
+    [SerializeField] private GameObject customizeUIRoot;
 
-    /* 現在選択しているオブジェクト */
-    private int currentObjectIndex;
+    [Header("勇者")]
+    [SerializeField] private GameObject playerPrefab;
+    [SerializeField] private Transform playerSpawnPoint;
 
+    [Header("ゲーム中のHP・状態UI")]
+    [SerializeField] private PlayerGameUI playerGameUI;
 
-    /*=========================
-     * 配置場所選択
-     *=========================*/
+    [Header("ステージ3 カメラ（他ステージは未設定でOK）")]
+    [SerializeField] private StageCameraController stageCamera;
 
-    /* 現在選択している配置場所 */
-    private StagePlacementSlot currentSlot;
+    [Header("後半最初の配置枠番号（0から）")]
+    [SerializeField] private int backStartSlotIndex = 4;
 
+    private bool isPlaying = false;
 
-    /*=========================
-     * 状態
-     *=========================*/
-
-    private enum CustomizeMode
+    private enum SelectArea
     {
-        ObjectSelect,
-        PlacementSelect
+        Start,
+        Placement,
+        Object
     }
 
-    /* 現在のモード */
-    private CustomizeMode currentMode;
+    private SelectArea currentArea = SelectArea.Object;
 
+    private int currentObjectIndex = 0;
+    private int currentSlotIndex = 0;
+    private int placedCount = 0;
 
-    /*=========================
-     * 初期化
-     *=========================*/
-
-    void Start()
+    private void Start()
     {
-        /* オブジェクト個数を初期化 */
-        for (int i = 0; i < objects.Length; i++)
+        // 配置可能数の初期化
+        if (objects != null)
         {
-            objects[i].remainCount = objects[i].maxCount;
-        }
-
-        /* 最初のオブジェクト */
-        currentObjectIndex = 0;
-
-        /* 最初の配置場所 */
-        if (slots.Length > 0)
-        {
-            currentSlot = slots[0];
-        }
-
-        /* オブジェクト選択から開始 */
-        currentMode = CustomizeMode.ObjectSelect;
-
-        /* 配置カーソルを更新 */
-        UpdateSlotSelect();
-    }
-
-
-    /*=========================
-     * 更新
-     *=========================*/
-
-    void Update()
-    {
-        if (InputManager.Instance == null)
-        {
-            return;
-        }
-
-        /* オブジェクト選択 */
-        if (currentMode == CustomizeMode.ObjectSelect)
-        {
-            ObjectSelectUpdate();
-        }
-
-        /* 配置場所選択 */
-        else if (currentMode == CustomizeMode.PlacementSelect)
-        {
-            PlacementSelectUpdate();
-        }
-    }
-
-
-    /*=========================
-     * オブジェクト選択
-     *=========================*/
-
-    void ObjectSelectUpdate()
-    {
-        /* 上 */
-        if (InputManager.Instance.Up())
-        {
-            SelectPreviousObject();
-        }
-
-        /* 下 */
-        if (InputManager.Instance.Down())
-        {
-            SelectNextObject();
-        }
-
-        /* 決定 */
-        if (InputManager.Instance.Submit())
-        {
-            /* 個数が残っている場合 */
-            if (objects[currentObjectIndex].remainCount > 0)
+            foreach (StageObjectData data in objects)
             {
-                currentMode = CustomizeMode.PlacementSelect;
-
-                UpdateSlotSelect();
+                if (data != null)
+                    data.remainCount = data.maxCount;
             }
         }
+
+        // すでに配置されている数を取得
+        placedCount = 0;
+
+        if (slots != null)
+        {
+            foreach (StagePlacementSlot slot in slots)
+            {
+                if (slot != null && slot.IsPlaced())
+                {
+                    placedCount++;
+
+                    int index = slot.placedObjectIndex;
+
+                    if (objects != null &&
+                        index >= 0 &&
+                        index < objects.Length &&
+                        objects[index] != null)
+                    {
+                        objects[index].remainCount =
+                            Mathf.Max(
+                                0,
+                                objects[index].remainCount - 1
+                            );
+                    }
+                }
+            }
+        }
+
+        // ゲーム中UIは開始前に非表示
+        if (playerGameUI != null)
+            playerGameUI.gameObject.SetActive(false);
+
+        UpdateObjectUI();
+        UpdateNumberUI();
+        UpdateSelection();
+
+        // 初期カメラは前半
+        if (stageCamera != null)
+            stageCamera.SetCustomizeSide(false);
     }
 
-
-    /*=========================
-     * 次のオブジェクト
-     *=========================*/
-
-    void SelectNextObject()
+    private void Update()
     {
-        if (objects.Length == 0)
-        {
+        if (isPlaying ||
+            PauseManager.IsPaused ||
+            InputManager.Instance == null)
             return;
-        }
 
-        currentObjectIndex++;
-
-        if (currentObjectIndex >= objects.Length)
-        {
-            currentObjectIndex = 0;
-        }
-
-        Debug.Log(
-            "選択オブジェクト : " +
-            objects[currentObjectIndex].objectName
-        );
-    }
-
-
-    /*=========================
-     * 前のオブジェクト
-     *=========================*/
-
-    void SelectPreviousObject()
-    {
-        if (objects.Length == 0)
-        {
-            return;
-        }
-
-        currentObjectIndex--;
-
-        if (currentObjectIndex < 0)
-        {
-            currentObjectIndex = objects.Length - 1;
-        }
-
-        Debug.Log(
-            "選択オブジェクト : " +
-            objects[currentObjectIndex].objectName
-        );
-    }
-
-
-    /*=========================
-     * 配置場所選択
-     *=========================*/
-
-    void PlacementSelectUpdate()
-    {
-        /* 上 */
         if (InputManager.Instance.Up())
         {
-            MoveUp();
+            ChangeArea(-1);
         }
-
-        /* 下 */
-        if (InputManager.Instance.Down())
+        else if (InputManager.Instance.Down())
         {
-            MoveDown();
+            ChangeArea(1);
         }
 
-        /* 左 */
         if (InputManager.Instance.Left())
         {
-            MoveLeft();
+            MoveHorizontal(-1);
         }
-
-        /* 右 */
-        if (InputManager.Instance.Right())
+        else if (InputManager.Instance.Right())
         {
-            MoveRight();
+            MoveHorizontal(1);
         }
 
-        /* 決定 */
         if (InputManager.Instance.Submit())
         {
-            PlaceObject();
+            Submit();
         }
 
-        /* 戻る */
         if (InputManager.Instance.Back())
         {
-            currentMode = CustomizeMode.ObjectSelect;
-
-            /* カーソルを非表示 */
-            HideSlotSelect();
+            currentArea = SelectArea.Object;
+            UpdateSelection();
         }
     }
 
-
-    /*=========================
-     * 上移動
-     *=========================*/
-
-    void MoveUp()
+    private void ChangeArea(int direction)
     {
-        if (currentSlot == null)
+        const int areaCount = 3;
+
+        int next =
+            ((int)currentArea + direction + areaCount)
+            % areaCount;
+
+        currentArea = (SelectArea)next;
+
+        UpdateSelection();
+    }
+
+    private void MoveHorizontal(int direction)
+    {
+        if (currentArea == SelectArea.Object)
         {
-            return;
+            if (objects == null || objects.Length == 0)
+                return;
+
+            currentObjectIndex =
+                (currentObjectIndex + direction + objects.Length)
+                % objects.Length;
+
+            UpdateObjectUI();
+            UpdateNumberUI();
         }
-
-        if (currentSlot.up != null)
+        else if (currentArea == SelectArea.Placement)
         {
-            currentSlot = currentSlot.up;
+            if (slots == null || slots.Length == 0)
+                return;
 
-            UpdateSlotSelect();
+            currentSlotIndex =
+                (currentSlotIndex + direction + slots.Length)
+                % slots.Length;
+
+            UpdateSelection();
         }
     }
 
-
-    /*=========================
-     * 下移動
-     *=========================*/
-
-    void MoveDown()
+    private void Submit()
     {
-        if (currentSlot == null)
+        switch (currentArea)
         {
-            return;
-        }
+            case SelectArea.Start:
+                StartGame();
+                break;
 
-        if (currentSlot.down != null)
-        {
-            currentSlot = currentSlot.down;
+            case SelectArea.Placement:
+                PlaceObject();
+                break;
 
-            UpdateSlotSelect();
+            case SelectArea.Object:
+                currentArea = SelectArea.Placement;
+                UpdateSelection();
+                break;
         }
     }
 
-
-    /*=========================
-     * 左移動
-     *=========================*/
-
-    void MoveLeft()
+    private void UpdateSelection()
     {
-        if (currentSlot == null)
+        if (objectSelectArrow != null)
         {
-            return;
+            objectSelectArrow.SetActive(
+                currentArea == SelectArea.Object
+            );
         }
 
-        if (currentSlot.left != null)
+        if (startSelectArrow != null)
         {
-            currentSlot = currentSlot.left;
-
-            UpdateSlotSelect();
-        }
-    }
-
-
-    /*=========================
-     * 右移動
-     *=========================*/
-
-    void MoveRight()
-    {
-        if (currentSlot == null)
-        {
-            return;
+            startSelectArrow.SetActive(
+                currentArea == SelectArea.Start
+            );
         }
 
-        if (currentSlot.right != null)
+        if (slots != null)
         {
-            currentSlot = currentSlot.right;
-
-            UpdateSlotSelect();
-        }
-    }
-
-
-    /*=========================
-     * カーソル表示更新
-     *=========================*/
-
-    void UpdateSlotSelect()
-    {
-        /* 全て非選択 */
-        for (int i = 0; i < slots.Length; i++)
-        {
-            if (slots[i] != null)
+            for (int i = 0; i < slots.Length; i++)
             {
-                slots[i].SetSelect(false);
+                if (slots[i] != null)
+                {
+                    slots[i].SetSelect(
+                        currentArea == SelectArea.Placement &&
+                        i == currentSlotIndex
+                    );
+                }
             }
         }
 
-        /* 現在位置を選択 */
-        if (currentSlot != null)
+
+        if (stageCamera != null)
         {
-            currentSlot.SetSelect(true);
-        }
-    }
-
-
-    /*=========================
-     * カーソル非表示
-     *=========================*/
-
-    void HideSlotSelect()
-    {
-        for (int i = 0; i < slots.Length; i++)
-        {
-            if (slots[i] != null)
+            if (currentArea == SelectArea.Start)
             {
-                slots[i].SetSelect(false);
+                stageCamera.SetCustomizeSide(false);
+            }
+            else if (currentArea == SelectArea.Placement &&
+                     slots != null &&
+                     currentSlotIndex >= 0 &&
+                     currentSlotIndex < slots.Length &&
+                     slots[currentSlotIndex] != null)
+            {
+                // 選択している配置枠の実際の位置を渡す
+                stageCamera.ShowCustomizeTarget(
+                    slots[currentSlotIndex].transform.position
+                );
             }
         }
+
     }
 
-
-    /*=========================
-     * オブジェクト配置
-     *=========================*/
-
-    void PlaceObject()
+    private void UpdateObjectUI()
     {
-        if (currentSlot == null)
-        {
+        if (objectUI == null ||
+            objects == null ||
+            objects.Length == 0)
             return;
+
+        if (objects[currentObjectIndex] == null)
+            return;
+
+        objectUI.SetObjectSprite(
+            objects[currentObjectIndex].iconSprite
+        );
+    }
+
+    private void UpdateNumberUI()
+    {
+        if (totalRemainUI != null)
+        {
+            totalRemainUI.SetNumber(
+                Mathf.Max(0, maxPlacementCount - placedCount)
+            );
         }
 
-        StageObjectData data = objects[currentObjectIndex];
-
-        /* 個数確認 */
-        if (data.remainCount <= 0)
+        if (objectRemainUI != null &&
+            objects != null &&
+            objects.Length > 0 &&
+            objects[currentObjectIndex] != null)
         {
+            objectRemainUI.SetNumber(
+                objects[currentObjectIndex].remainCount
+            );
+        }
+    }
+
+    private void PlaceObject()
+    {
+        if (slots == null ||
+            currentSlotIndex < 0 ||
+            currentSlotIndex >= slots.Length)
             return;
+
+        if (objects == null ||
+            currentObjectIndex < 0 ||
+            currentObjectIndex >= objects.Length)
+            return;
+
+        StagePlacementSlot slot = slots[currentSlotIndex];
+        StageObjectData newData = objects[currentObjectIndex];
+
+        if (slot == null ||
+            newData == null ||
+            newData.prefab == null)
+            return;
+
+        bool isReplacing = slot.IsPlaced();
+        int oldIndex = slot.placedObjectIndex;
+
+        // 同じ種類なら配置し直さない
+        if (isReplacing && oldIndex == currentObjectIndex)
+            return;
+
+        // 残り数を確認
+        if (newData.remainCount <= 0)
+            return;
+
+        // 新規配置の場合は全体上限を確認
+        if (!isReplacing && placedCount >= maxPlacementCount)
+            return;
+
+        // 置き換え前のオブジェクト数を戻す
+        if (isReplacing &&
+            oldIndex >= 0 &&
+            oldIndex < objects.Length &&
+            objects[oldIndex] != null)
+        {
+            objects[oldIndex].remainCount++;
         }
 
-        /* 配置 */
-        currentSlot.PlaceObject(data.prefab);
+        // オブジェクト配置
+        slot.PlaceObject(newData.prefab);
+        slot.placedObjectIndex = currentObjectIndex;
 
-        /* 個数を減らす */
-        data.remainCount--;
+        newData.remainCount--;
+
+        if (!isReplacing)
+            placedCount++;
+
+        UpdateNumberUI();
 
         Debug.Log(
-            data.objectName +
-            " を配置 : 残り " +
-            data.remainCount
+            newData.objectName +
+            (isReplacing ? " に置き換えました" : " を配置しました")
+        );
+    }
+
+    private void StartGame()
+    {
+        if (isPlaying)
+            return;
+
+        if (playerPrefab == null || playerSpawnPoint == null)
+        {
+            Debug.LogError(
+                "勇者Prefabか召喚位置が未設定です"
+            );
+            return;
+        }
+
+        isPlaying = true;
+
+        // 配置枠の選択矢印を非表示
+        if (slots != null)
+        {
+            foreach (StagePlacementSlot slot in slots)
+            {
+                if (slot != null)
+                    slot.SetSelect(false);
+            }
+        }
+
+        // カスタマイズUIを非表示
+        if (customizeUIRoot != null)
+            customizeUIRoot.SetActive(false);
+
+        // 勇者を生成
+        GameObject player = Instantiate(
+            playerPrefab,
+            playerSpawnPoint.position,
+            playerSpawnPoint.rotation
         );
 
-        /* オブジェクト選択へ戻る */
-        currentMode = CustomizeMode.ObjectSelect;
+        // HP・状態異常UIを開始
+        if (playerGameUI != null)
+        {
+            playerGameUI.SetPlayer(player);
+        }
+        else
+        {
+            Debug.LogWarning(
+                "PlayerGameUIが未設定です"
+            );
+        }
 
-        /* 配置カーソルを非表示 */
-        HideSlotSelect();
+        // カメラを勇者の位置で切り替え
+        if (stageCamera != null)
+        {
+            stageCamera.StartPlayerCamera(
+                player.transform
+            );
+        }
+
+        Debug.Log("勇者操作開始！");
     }
 }

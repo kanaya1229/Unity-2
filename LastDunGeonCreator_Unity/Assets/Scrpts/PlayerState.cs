@@ -190,4 +190,18 @@ public class PlayerState : MonoBehaviour
     {
         return abnormalTime;
     }
+
+
+    /* ‰Šã‚È‚Ç‚Ìó‘ÔˆÙí‚ğŠJn */
+    public void ApplyFire()
+    {
+        TakeDamage();
+        SetAbnormal(20.0f);
+    }
+
+    /* ‰Šãó‘Ô‚©‚Ç‚¤‚© */
+    public bool IsBurning()
+    {
+        return IsAbnormal();
+    }
 }
